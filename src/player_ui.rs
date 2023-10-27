@@ -1,6 +1,7 @@
 use rodio::Sink;
 use eframe::egui;
 use std::path::PathBuf;
+use std::path::Path;
 use crate::playback::get_song;
 
 pub struct Song {
@@ -33,16 +34,21 @@ impl eframe::App for MusicPlayer {
         // Sink management
         self.sink.set_volume(self.volume/100.0);
         if self.sink.empty() && !self.playlist.is_empty() {
-            self.playlist.rotate_left(1);
+            // Might change how this works later
+            self.playlist.rotate_right(1);
             self.sink.append(get_song(self.playlist[0].clone()));
         }
 
         // UI definition
+        // TODO: Write playlist view, try out panels to make it look nice.
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Rust Player");
             // Skip button
-            if ui.button("Skip").clicked() {
-                self.skip();
+            if ui.button("next").clicked() {
+                self.next();
+            }
+            if ui.button("last").clicked() {
+                self.last();
             }
             // Play/Pause
             if ui.button("Play/Pause").clicked() {
@@ -56,7 +62,12 @@ impl eframe::App for MusicPlayer {
             ctx.input(|i| {
                 if !i.raw.dropped_files.is_empty() {
                     for file in &i.raw.dropped_files {
-                        self.playlist.push(file.path.clone().unwrap())
+                        if !Path::new(&file.path.clone().unwrap()).is_dir() {
+                            self.playlist.push(file.path.clone().unwrap())
+                        }
+                        else {
+                            println!("That is a dir :(");
+                        }
                     }
                     println!("File Paths: {:?}", self.playlist);
                 }
@@ -66,9 +77,15 @@ impl eframe::App for MusicPlayer {
 }
 
 impl MusicPlayer {
-    fn skip(&self) {
+    fn next(&mut self) {
+        self.playlist.rotate_right(1);
         self.sink.skip_one();
-        println!("Skipped");
+        self.sink.append(get_song(self.playlist[0].clone()));
+    }
+    fn last(&mut self) {
+        self.playlist.rotate_left(1);
+        self.sink.skip_one();
+        self.sink.append(get_song(self.playlist[0].clone()));
     }
     fn toggle(&self) {
         if self.sink.is_paused() {
