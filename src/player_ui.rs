@@ -43,24 +43,14 @@ impl eframe::App for MusicPlayer {
         }
 
         // UI definition
-        // TODO: Write playlist view, try out panels to make it look nice.
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::SidePanel::left("Playlist").show(ctx, |ui| {
+            ui.heading("Playlist");
+            for song in &self.playlist {
+                ui.label(format!("Title: {} Artist: {}", song.title, song.artist));
+            }
+        });
+        egui::TopBottomPanel::top("title").show(ctx, |ui| {
             ui.heading("Rust Player");
-            // Skip button
-            if ui.button("next").clicked() {
-                self.next();
-            }
-            if ui.button("last").clicked() {
-                self.last();
-            }
-            // Play/Pause
-            if ui.button("Play/Pause").clicked() {
-                self.toggle();
-            }
-            // Volume slider/label
-            ui.add(egui::Slider::new(&mut self.volume, 0.0..=100.0).text("VOL"));
-            ui.heading(format!("Volume: {}", self.sink.volume()*100.0));
-
             // Drag/drop file handling
             ctx.input(|i| {
                 if !i.raw.dropped_files.is_empty() {
@@ -76,19 +66,41 @@ impl eframe::App for MusicPlayer {
                 }
             });
         });
+        egui::TopBottomPanel::bottom("controls").show(ctx, |ui| {
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::BOTTOM), |ui| {
+                // Previous
+                if ui.button("last").clicked() {
+                    self.last();
+                }
+                // Play/Pause
+                if ui.button("Play/Pause").clicked() {
+                    self.toggle();
+                }
+                // Next
+                if ui.button("next").clicked() {
+                    self.next();
+                }
+                // Volume slider
+                ui.add(egui::Slider::new(&mut self.volume, 0.0..=100.0).text("VOL"));
+            });
+        });
     }
 }
 
 impl MusicPlayer {
     fn next(&mut self) {
-        self.playlist.rotate_right(1);
-        self.sink.skip_one();
-        self.sink.append(get_song(self.playlist[0].path.clone()));
+        if !self.playlist.is_empty() {
+            self.playlist.rotate_right(1);
+            self.sink.skip_one();
+            self.sink.append(get_song(self.playlist[0].path.clone()));
+        }
     }
     fn last(&mut self) {
-        self.playlist.rotate_left(1);
-        self.sink.skip_one();
-        self.sink.append(get_song(self.playlist[0].path.clone()));
+        if !self.playlist.is_empty() {
+            self.playlist.rotate_left(1);
+            self.sink.skip_one();
+            self.sink.append(get_song(self.playlist[0].path.clone()));
+        }
     }
     fn toggle(&self) {
         if self.sink.is_paused() {
@@ -100,8 +112,8 @@ impl MusicPlayer {
     }
 
     fn parse_song(& self, filename: PathBuf) -> Song {
-        let tag = Tag::new().read_from_path(filename.clone()).unwrap();
-        let song_title = tag.title().unwrap_or("").to_string();
+        let tag = Tag::new().read_from_path(filename.clone()).unwrap_or(Box::new(audiotags::FlacTag::new()));
+        let song_title = tag.title().unwrap_or(filename.file_name().unwrap().to_str().unwrap()).to_string(); // There has to be a better way
         let song_artist = tag.artist().unwrap_or("").to_string();
         Song {
             title: song_title,
