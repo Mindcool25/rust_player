@@ -1,16 +1,19 @@
+use audiotags::Tag;
 use rodio::Sink;
 use eframe::egui;
 use std::path::PathBuf;
 use std::path::Path;
 use crate::playback::get_song;
 
+#[derive(Debug, Clone)]
 pub struct Song {
     pub path: PathBuf,
-    pub index: i32,
+    pub title: String,
+    pub artist: String,
 }
 
 pub struct MusicPlayer {
-    pub playlist: Vec<PathBuf>,
+    pub playlist: Vec<Song>,
     pub sink: Sink,
     pub volume: f32,
 }
@@ -36,7 +39,7 @@ impl eframe::App for MusicPlayer {
         if self.sink.empty() && !self.playlist.is_empty() {
             // Might change how this works later
             self.playlist.rotate_right(1);
-            self.sink.append(get_song(self.playlist[0].clone()));
+            self.sink.append(get_song(self.playlist[0].path.clone()));
         }
 
         // UI definition
@@ -63,7 +66,7 @@ impl eframe::App for MusicPlayer {
                 if !i.raw.dropped_files.is_empty() {
                     for file in &i.raw.dropped_files {
                         if !Path::new(&file.path.clone().unwrap()).is_dir() {
-                            self.playlist.push(file.path.clone().unwrap())
+                            self.playlist.push(self.parse_song(file.path.clone().unwrap()));
                         }
                         else {
                             println!("That is a dir :(");
@@ -80,12 +83,12 @@ impl MusicPlayer {
     fn next(&mut self) {
         self.playlist.rotate_right(1);
         self.sink.skip_one();
-        self.sink.append(get_song(self.playlist[0].clone()));
+        self.sink.append(get_song(self.playlist[0].path.clone()));
     }
     fn last(&mut self) {
         self.playlist.rotate_left(1);
         self.sink.skip_one();
-        self.sink.append(get_song(self.playlist[0].clone()));
+        self.sink.append(get_song(self.playlist[0].path.clone()));
     }
     fn toggle(&self) {
         if self.sink.is_paused() {
@@ -93,6 +96,17 @@ impl MusicPlayer {
         }
         else {
             self.sink.pause();
+        }
+    }
+
+    fn parse_song(& self, filename: PathBuf) -> Song {
+        let tag = Tag::new().read_from_path(filename.clone()).unwrap();
+        let song_title = tag.title().unwrap_or("").to_string();
+        let song_artist = tag.artist().unwrap_or("").to_string();
+        Song {
+            title: song_title,
+            artist: song_artist,
+            path:filename
         }
     }
 }

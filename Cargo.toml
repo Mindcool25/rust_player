@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 rodio="0.17.2"
 eframe="0.23.0"
+audiotags="0.4.1"
